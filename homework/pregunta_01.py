@@ -1,6 +1,9 @@
 # pylint: disable=import-outside-toplevel
 # pylint: disable=line-too-long
 # flake8: noqa
+import os
+import zipfile
+import pandas as pd
 """
 Escriba el codigo que ejecute la accion solicitada en cada pregunta.
 """
@@ -71,3 +74,63 @@ def pregunta_01():
 
 
     """
+    # Ruta del archivo zip
+    zip_path = os.path.join("files", "input.zip")
+    # Carpeta destino para la extracción (se espera que se cree "files/input")
+    input_folder = os.path.join("files", "input")
+    
+    # Crear la carpeta "files/input" si no existe
+    if not os.path.exists(input_folder):
+        os.makedirs(input_folder)
+    
+    # Descomprimir el archivo zip en la carpeta "files/input"
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(input_folder)
+    
+    # Verificar si la estructura extraída tiene la carpeta "train" en el nivel esperado.
+    # Si no se encuentra, es posible que el zip contenga una carpeta raíz extra.
+    expected_train_path = os.path.join(input_folder, "train")
+    if not os.path.isdir(expected_train_path):
+        # Listar las carpetas dentro de input_folder
+        subdirs = [d for d in os.listdir(input_folder) if os.path.isdir(os.path.join(input_folder, d))]
+        # Si hay solo una carpeta, asumimos que es la raíz real de los datos
+        if len(subdirs) == 1:
+            input_folder = os.path.join(input_folder, subdirs[0])
+        else:
+            raise FileNotFoundError("No se encontró la carpeta 'train' en la estructura extraída.")
+    
+    # Crear la carpeta de salida "files/output"
+    output_folder = os.path.join("files", "output")
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
+    # Procesar cada conjunto de datos: train y test
+    for dataset in ["train", "test"]:
+        dataset_path = os.path.join(input_folder, dataset)
+        csv_filename = os.path.join(output_folder, f"{dataset}_dataset.csv")
+        registros = []  # Lista para almacenar los registros
+        
+        # Se asume que cada dataset tiene las subcarpetas: negative, positive y neutral
+        for sentiment in ["negative", "positive", "neutral"]:
+            sentiment_path = os.path.join(dataset_path, sentiment)
+            if not os.path.isdir(sentiment_path):
+                raise FileNotFoundError(f"No se encontró la carpeta esperada: {sentiment_path}")
+            # Listar y ordenar los archivos .txt
+            for filename in sorted(os.listdir(sentiment_path)):
+                if filename.endswith(".txt"):
+                    file_path = os.path.join(sentiment_path, filename)
+                    with open(file_path, "r", encoding="utf-8") as file:
+                        phrase = file.read().strip()
+                    registros.append([phrase, sentiment])
+        
+        # Crear un DataFrame y guardar en CSV con columnas "phrase" y "target"
+        df = pd.DataFrame(registros, columns=["phrase", "target"])
+        df.to_csv(csv_filename, index=False, encoding="utf-8")
+        print(f"Archivo guardado: {csv_filename}")
+
+def main():
+    # Llamar a la función para procesar y generar los archivos CSV
+    pregunta_01()
+
+if __name__ == "__main__":
+    main()
